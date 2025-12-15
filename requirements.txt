@@ -7,3 +7,4 @@ bitsandbytes
 controlnet_aux
 opencv-python
 imageio
+tqdm
