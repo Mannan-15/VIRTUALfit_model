@@ -1,0 +1,9 @@
+torch
+torchvision
+diffusers
+transformers
+accelerate
+bitsandbytes
+controlnet_aux
+opencv-python
+imageio
