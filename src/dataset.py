@@ -11,21 +11,19 @@ class VITONDataset(Dataset):
         self.data_root = data_root
         self.mode = mode
         
-        # Paths to subfolders
         self.image_dir = os.path.join(data_root, mode, "image")
-        self.cloth_dir = os.path.join(data_root, mode, "cloth")
+        self.pose_dir = os.path.join(data_root, mode, "pose") # New Folder
         
-        # Read the pair list (e.g., "00001_00.jpg 00001_00.jpg")
-        # If pairs file doesn't exist, we just match by filename
         self.image_files = sorted(os.listdir(self.image_dir))
         
-        # Transforms (Resize to 512x512 and Normalize to [-1, 1])
+        # Transform: Normalize to [-1, 1]
         self.transform = transforms.Compose([
             transforms.Resize((512, 512)),
             transforms.ToTensor(),
             transforms.Normalize([0.5], [0.5])
         ])
-        # Mask transform (No normalization, just 0-1)
+        
+        # Mask Transform: No Normalization, just 0-1
         self.mask_transform = transforms.Compose([
             transforms.Resize((512, 512), interpolation=transforms.InterpolationMode.NEAREST),
             transforms.ToTensor()
@@ -35,42 +33,37 @@ class VITONDataset(Dataset):
         return len(self.image_files)
 
     def get_upper_body_mask(self, img_size):
-        """
-        Creates a simple box mask for the upper body.
-        In a full Phase 2 app, we would use a Segmentation Model here.
-        """
         w, h = img_size
         mask = Image.new("L", (w, h), 0)
         draw = ImageDraw.Draw(mask)
-        # Approximate torso box (Left, Top, Right, Bottom)
         draw.rectangle([w//4, h//4, w*3//4, h*3//4], fill=255)
         return mask
 
     def __getitem__(self, idx):
         img_name = self.image_files[idx]
         
-        # 1. Load Person Image
+        # 1. Load Image
         img_path = os.path.join(self.image_dir, img_name)
         image = Image.open(img_path).convert("RGB")
         
-        # 2. Load Cloth Image (Assumes same filename)
-        cloth_path = os.path.join(self.cloth_dir, img_name)
-        if not os.path.exists(cloth_path):
-            # Fallback: Try to find any cloth if exact match fails (rare)
-            cloth_path = img_path 
-        cloth = Image.open(cloth_path).convert("RGB")
+        # 2. Load PRE-COMPUTED Pose
+        # Note: We saved poses as .png, images might be .jpg
+        pose_name = img_name.replace(".jpg", ".png")
+        pose_path = os.path.join(self.pose_dir, pose_name)
+        
+        if os.path.exists(pose_path):
+            pose = Image.open(pose_path).convert("RGB")
+        else:
+            # Fallback (Should not happen if you ran preprocess)
+            pose = Image.new("RGB", (512, 512), (0, 0, 0))
 
-        # 3. Create Mask (The area we want to repaint)
+        # 3. Create Mask
         mask = self.get_upper_body_mask(image.size)
         
-        # 4. Apply Transforms
-        pixel_values = self.transform(image)
-        cloth_values = self.transform(cloth)
-        mask_values = self.mask_transform(mask)
-
+        # 4. Returns
         return {
-            "pixel_values": pixel_values, # The Person
-            "cloth_values": cloth_values, # The Cloth (Target)
-            "mask": mask_values,          # The Hole
+            "pixel_values": self.transform(image),
+            "pose_values": self.transform(pose), # Already resized/normalized
+            "mask": self.mask_transform(mask),
             "filename": img_name
         }
