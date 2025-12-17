@@ -24,7 +24,7 @@ def train():
     accelerator = Accelerator(mixed_precision="fp16")
     device = accelerator.device
 
-    print(f"--- Starting Turbo Training on {device} ---")
+    print(f"--- Starting Training on {device} ---")
 
     # 1. Load Data
     train_dataset = VITONDataset(data_root=DATA_DIR, mode="train")
